@@ -14,8 +14,6 @@ void find_absolute_beginnings(Axis& axis_x, Axis& axis_y, double& ABSOLUTE_BEGIN
 void generate_and_save_coordinates(const std::string& file_path, double ABSOLUTE_BEGINNING_X, double ABSOLUTE_BEGINNING_Y, double x_steps, double y_steps, double x_step_size, double y_step_size, int stay_time_s);
 void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y);
 
-std::string get_current_timestamp();
-
 int main() {
     try {
         Library::checkVersion();
@@ -209,16 +207,6 @@ void generate_and_save_coordinates(const std::string& file_path, double ABSOLUTE
     std::cout << "Coordinates saved to " << file_path << std::endl;
 }
 
-std::string get_current_timestamp() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-    std::tm now_tm;
-    localtime_s(&now_tm, &now_time);
-    std::stringstream ss;
-    ss << std::put_time(&now_tm, "%Y-%m-%d %H:%M:%S");
-    return ss.str();
-}
-
 
 void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y) {
     std::ifstream file(file_path);
@@ -230,10 +218,10 @@ void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y) {
     std::string line;
     while (std::getline(file, line)) {
         std::istringstream ss(line);
-        std::string x_str, y_str, stay_time_str, timestamp_str;
+        std::string x_str, y_str, stay_time_str;
 
         try {
-            if (std::getline(ss, x_str, ',') && std::getline(ss, y_str, ',') && std::getline(ss, stay_time_str, ',') && std::getline(ss, timestamp_str, ',')) {  // Add time stamp in the csv, only print it out. (Have hr:min:sec)
+            if (std::getline(ss, x_str, ',') && std::getline(ss, y_str, ',') && std::getline(ss, stay_time_str, ',')) {  // Add time stamp in the csv, only print it out. (Have hr:min:sec)
                 double x_position = std::stod(x_str);
                 double y_position = std::stod(y_str);
                 int stay_time_s = std::stoi(stay_time_str);
@@ -251,31 +239,6 @@ void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y) {
                 std::this_thread::sleep_for(std::chrono::seconds(stay_time_s));
 
                 std::cout << "Moved to X: " << x_position << ", Y: " << y_position << " and waited for " << stay_time_s << " s." << std::endl;
-            }
-        }
-
-        try {
-            if (std::getline(ss, x_str, ',') && std::getline(ss, y_str, ',') && std::getline(ss, stay_time_str, ',') && std::getline(ss, timestamp_str, ',')) {
-                double x_position = std::stod(x_str);
-                double y_position = std::stod(y_str);
-                int stay_time_s = std::stoi(stay_time_str);
-
-                axis_x.unpark();
-                axis_x.moveAbsolute(x_position, Units::LENGTH_MILLIMETRES);
-                axis_x.waitUntilIdle();
-                axis_x.park();
-
-                axis_y.unpark();
-                axis_y.moveAbsolute(y_position, Units::LENGTH_MILLIMETRES);
-                axis_y.waitUntilIdle();
-                axis_y.park();
-
-                std::this_thread::sleep_for(std::chrono::seconds(stay_time_s));
-
-                std::string timestamp = get_current_timestamp();
-                output_file << x_position << "," << y_position << "," << stay_time_s << "," << timestamp << std::endl;
-
-                std::cout << "Moved to X: " << x_position << ", Y: " << y_position << " and waited for " << stay_time_s << " s at " << timestamp << "." << std::endl;
             }
         }
 
