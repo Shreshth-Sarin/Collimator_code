@@ -5,6 +5,8 @@
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <iomanip>
+#include <ctime>
 #include <zaber/motion/ascii.h>
 
 using namespace zaber::motion;
@@ -12,7 +14,10 @@ using namespace zaber::motion::ascii;
 
 void find_absolute_beginnings(Axis& axis_x, Axis& axis_y, double& ABSOLUTE_BEGINNING_X, double& ABSOLUTE_BEGINNING_Y, const std::string& file_path);
 void generate_and_save_coordinates(const std::string& file_path, double ABSOLUTE_BEGINNING_X, double ABSOLUTE_BEGINNING_Y, double x_steps, double y_steps, double x_step_size, double y_step_size, int stay_time_s);
-void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y);
+void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y, const std::string& output_file_path);
+
+std::string get_current_timestamp();
+std::string get_current_datetime_for_filename();
 
 int main() {
     try {
@@ -87,19 +92,21 @@ int main() {
             generate_and_save_coordinates(file_path, ABSOLUTE_BEGINNING_X, ABSOLUTE_BEGINNING_Y, x_steps, y_steps, x_step_size, y_step_size, stay_time_s);
 
             // Process the CSV for movements
-            process_csv(file_path, axis_x, axis_y);
+            std::string timestamped_file_path = "C:\\Users\\shres\\OneDrive\\Desktop\\output_with_timestamps_" + get_current_datetime_for_filename() + ".csv";  // Use a variable for directory path.
+            process_csv(file_path, axis_x, axis_y, timestamped_file_path);
 
             std::cout << "***************************************************" << std::endl;
             std::cout << "COMPLETED" << std::endl;
             std::cout << "***************************************************" << std::endl;
         }
         else if (user_choice == 2) {
-            std::cout << "NOTE: For windows, change \ to \\." << std::endl;
+            std::cout << "NOTE: For windows, change \\ to \\\\" << std::endl;
             std::cout << "Enter the file path of your csv file: " << std::endl;
             std::cin >> file_path;
 
             // Process the CSV for movements
-            process_csv(file_path, axis_x, axis_y);
+            std::string timestamped_file_path = "C:\\Users\\shres\\OneDrive\\Desktop\\output_with_timestamps_" + get_current_datetime_for_filename() + ".csv";
+            process_csv(file_path, axis_x, axis_y, timestamped_file_path);
 
             std::cout << "***************************************************" << std::endl;
             std::cout << "COMPLETED" << std::endl;
@@ -109,7 +116,6 @@ int main() {
             std::cerr << "Invalid input. Please enter 1 or 2." << std::endl;
         }
 
-        
     }
     catch (const std::exception& ex) {
         std::cerr << "An error occurred: " << ex.what() << std::endl;
@@ -181,7 +187,7 @@ void find_absolute_beginnings(Axis& axis_x, Axis& axis_y, double& ABSOLUTE_BEGIN
     }
 
     // Save the absolute beginning positions to the CSV file
-    file << ABSOLUTE_BEGINNING_X << "," << ABSOLUTE_BEGINNING_Y << ",0" << std::endl;
+    file << ABSOLUTE_BEGINNING_X << "," << ABSOLUTE_BEGINNING_Y << ",0,0" << std::endl;
     file.close();
 
     std::cout << "Absolute beginning positions saved to " << file_path << std::endl;
@@ -193,13 +199,12 @@ void generate_and_save_coordinates(const std::string& file_path, double ABSOLUTE
         std::cerr << "Could not open the file for writing: " << file_path << std::endl;
         return;
     }
-    
 
     for (double y = 0; y < y_steps; ++y) {
         for (double x = 0; x < x_steps; ++x) {
             double x_position = ABSOLUTE_BEGINNING_X + (x * x_step_size);
             double y_position = ABSOLUTE_BEGINNING_Y + (y * y_step_size);
-            file << x_position << "," << y_position << "," << stay_time_s << std::endl;
+            file << x_position << "," << y_position << "," << stay_time_s << ",0" << std::endl;
         }
     }
 
@@ -207,48 +212,88 @@ void generate_and_save_coordinates(const std::string& file_path, double ABSOLUTE
     std::cout << "Coordinates saved to " << file_path << std::endl;
 }
 
+std::string get_current_timestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm;
+    localtime_s(&now_tm, &now_time);
+    std::stringstream ss;
+    ss << std::put_time(&now_tm, "%Y-%m-%d %H:%M:%S");
+    ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
+}
 
-void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y) {
+std::string get_current_datetime_for_filename() {
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm;
+    localtime_s(&now_tm, &now_time);
+    std::stringstream ss;
+    ss << std::put_time(&now_tm, "%Y-%m-%d_%H-%M-%S");
+    ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
+}
+
+void process_csv(const std::string& file_path, Axis& axis_x, Axis& axis_y, const std::string& output_file_path) {
     std::ifstream file(file_path);
     if (!file.is_open()) {
         std::cerr << "Could not open the file: " << file_path << std::endl;
         return;
     }
 
+    std::ofstream output_file(output_file_path);
+    if (!output_file.is_open()) {
+        std::cerr << "Could not open the file for writing: " << output_file_path << std::endl;
+        return;
+    }
+
     std::string line;
     while (std::getline(file, line)) {
         std::istringstream ss(line);
-        std::string x_str, y_str, stay_time_str;
+        std::string x_str, y_str, stay_time_str, timestamp_str;
 
         try {
-            if (std::getline(ss, x_str, ',') && std::getline(ss, y_str, ',') && std::getline(ss, stay_time_str, ',')) {  // Add time stamp in the csv, only print it out. (Have hr:min:sec)
+            if (std::getline(ss, x_str, ',') && std::getline(ss, y_str, ',') && std::getline(ss, stay_time_str, ',')) {
                 double x_position = std::stod(x_str);
                 double y_position = std::stod(y_str);
                 int stay_time_s = std::stoi(stay_time_str);
-
+                
+                std::cout << "First timestamp; before movement starts: " << get_current_timestamp() << std::endl;
                 axis_x.unpark();
                 axis_x.moveAbsolute(x_position, Units::LENGTH_MILLIMETRES);
                 axis_x.waitUntilIdle();
                 axis_x.park();
+
+                std::cout << "Second timestamp; x-moved and y-starts: " << get_current_timestamp() << std::endl;
 
                 axis_y.unpark();
                 axis_y.moveAbsolute(y_position, Units::LENGTH_MILLIMETRES);
                 axis_y.waitUntilIdle();
                 axis_y.park();
 
+                std::cout << "Third timestamp; after movement is complete: " << get_current_timestamp() << std::endl;
+
+
+                std::string timestamp = get_current_timestamp();
+
+
                 std::this_thread::sleep_for(std::chrono::seconds(stay_time_s));
 
-                std::cout << "Moved to X: " << x_position << ", Y: " << y_position << " and waited for " << stay_time_s << " s." << std::endl;
+                
+                output_file << x_position << "," << y_position << "," << stay_time_s << "," << timestamp << std::endl;
+
+                std::cout << "Moved to X: " << x_position << ", Y: " << y_position << " and waited for " << stay_time_s << " s at " << timestamp << "." << std::endl;
+
+                std::cout << "--------------------------------------------------------------------" << std::endl << std::endl;
             }
         }
-
-        // Write the x,y, time stamp into a new csv (keep the same values from the read csv). Make sure to add the new time stamps everytime.
-
-
         catch (const std::exception& e) {
             std::cerr << "Error processing line: " << line << " - " << e.what() << std::endl;
         }
     }
 
     file.close();
+    output_file.close();
 }
